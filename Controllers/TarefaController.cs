@@ -1,6 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
-using TrilhaApiDesafio.Context;
-using TrilhaApiDesafio.Models;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.AtualizarTarefa;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.CriarTarefa;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.DeletarTarefa;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.ObterTarefaPorData;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.ObterTarefaPorId;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.ObterTarefaPorStatus;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.ObterTarefaPorTitulo;
+using TrilhaApiDesafio.Application.UseCases.Tarefas.ObterTarefas;
+using TrilhaApiDesafio.Domain.Entities;
+using TrilhaApiDesafio.Shared.Comunication.Responses;
 
 namespace TrilhaApiDesafio.Controllers
 {
@@ -8,88 +16,105 @@ namespace TrilhaApiDesafio.Controllers
     [Route("[controller]")]
     public class TarefaController : ControllerBase
     {
-        private readonly OrganizadorContext _context;
+        //private readonly OrganizadorContext _context;
 
-        public TarefaController(OrganizadorContext context)
-        {
-            _context = context;
-        }
+        //public TarefaController(OrganizadorContext context)
+        //{
+        //    _context = context;
+        //}
 
         [HttpGet("{id}")]
-        public IActionResult ObterPorId(int id)
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ObterPorId([FromServices] IObterTarefaPorId useCase, [FromRoute] int id)
         {
-            // TODO: Buscar o Id no banco utilizando o EF
-            // TODO: Validar o tipo de retorno. Se não encontrar a tarefa, retornar NotFound,
-            // caso contrário retornar OK com a tarefa encontrada
-            return Ok();
+            var result = await useCase.Execute(id);
+            return Ok(result);
         }
 
         [HttpGet("ObterTodos")]
-        public IActionResult ObterTodos()
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ObterTodos([FromServices] IObterTarefas useCase)
         {
-            // TODO: Buscar todas as tarefas no banco utilizando o EF
-            return Ok();
+            var result = await useCase.Execute();
+
+            if (result.Any())
+            {
+                return Ok(result);
+            }
+
+            return NoContent();
         }
 
         [HttpGet("ObterPorTitulo")]
-        public IActionResult ObterPorTitulo(string titulo)
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ObterPorTitulo([FromServices] IObterTarefasPorTitulo useCase, [FromQuery] string titulo)
         {
-            // TODO: Buscar  as tarefas no banco utilizando o EF, que contenha o titulo recebido por parâmetro
-            // Dica: Usar como exemplo o endpoint ObterPorData
-            return Ok();
+            var result = await useCase.Execute(titulo);
+
+            if (result.Any())
+            {
+                return Ok(result);
+            }
+
+            return NoContent();
         }
 
         [HttpGet("ObterPorData")]
-        public IActionResult ObterPorData(DateTime data)
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ObterPorData([FromServices] IObterTarefasPorData useCase, [FromQuery] DateTime data)
         {
-            var tarefa = _context.Tarefas.Where(x => x.Data.Date == data.Date);
-            return Ok(tarefa);
+            var result = await useCase.Execute(data);
+
+            if (result.Any())
+            {
+                return Ok(result);
+            }
+
+            return NoContent();
         }
 
         [HttpGet("ObterPorStatus")]
-        public IActionResult ObterPorStatus(EnumStatusTarefa status)
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> ObterPorStatus([FromServices] IObterTarefasPorStatus useCase, [FromQuery] EnumStatusTarefa status)
         {
-            // TODO: Buscar  as tarefas no banco utilizando o EF, que contenha o status recebido por parâmetro
-            // Dica: Usar como exemplo o endpoint ObterPorData
-            var tarefa = _context.Tarefas.Where(x => x.Status == status);
-            return Ok(tarefa);
+            var result = await useCase.Execute(status);
+
+            if (result.Any())
+            {
+                return Ok(result);
+            }
+
+            return NoContent();
         }
 
-        [HttpPost]
-        public IActionResult Criar(Tarefa tarefa)
-        {
-            if (tarefa.Data == DateTime.MinValue)
-                return BadRequest(new { Erro = "A data da tarefa não pode ser vazia" });
 
-            // TODO: Adicionar a tarefa recebida no EF e salvar as mudanças (save changes)
-            return CreatedAtAction(nameof(ObterPorId), new { id = tarefa.Id }, tarefa);
+        [HttpPost]
+        [ProducesResponseType(typeof(RespostaTarefaJson), StatusCodes.Status201Created)]
+        public async Task<IActionResult> Criar(
+            [FromServices] ICriarTarefaUseCase useCase,
+            [FromBody] CriarTarefaRequest request)
+        {
+            var result = await useCase.Execute(request);
+
+            return Created(string.Empty, result);
         }
 
         [HttpPut("{id}")]
-        public IActionResult Atualizar(int id, Tarefa tarefa)
+        public async Task<IActionResult> Atualizar([FromServices] IAtualizarTarefaUseCase useCase , int id, AtualizarTarefaRequest tarefa)
         {
-            var tarefaBanco = _context.Tarefas.Find(id);
+            await useCase.Execute(id, tarefa);
 
-            if (tarefaBanco == null)
-                return NotFound();
-
-            if (tarefa.Data == DateTime.MinValue)
-                return BadRequest(new { Erro = "A data da tarefa não pode ser vazia" });
-
-            // TODO: Atualizar as informações da variável tarefaBanco com a tarefa recebida via parâmetro
-            // TODO: Atualizar a variável tarefaBanco no EF e salvar as mudanças (save changes)
-            return Ok();
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
-        public IActionResult Deletar(int id)
+        public async Task<IActionResult> Deletar([FromServices] IDeletarTarefa useCase, [FromRoute] int id)
         {
-            var tarefaBanco = _context.Tarefas.Find(id);
-
-            if (tarefaBanco == null)
-                return NotFound();
-
-            // TODO: Remover a tarefa encontrada através do EF e salvar as mudanças (save changes)
+            await useCase.Execute(id);
             return NoContent();
         }
     }
